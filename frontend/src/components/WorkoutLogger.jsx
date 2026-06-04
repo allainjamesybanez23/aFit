@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Plus, Minus, Dumbbell, Save } from 'lucide-react';
 import api from '../api';
 import RestTimer from './RestTimer'; // Import the new timer
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { Plus, Minus, Dumbbell, Save, ArrowLeft } from 'lucide-react';
 
 const WorkoutLogger = () => {
     const { exerciseId } = useParams(); // Grabs the ID from the URL (e.g., /workout/1)
@@ -47,11 +47,11 @@ const WorkoutLogger = () => {
                 weight: weight,
                 reps: reps,
                 rest_timer_used: restTimer,
-                workout: 1, 
+                // Automatically pull the active session ID!
+                workout: localStorage.getItem('activeWorkoutId'), 
                 set_order: currentSetOrder 
             });
             
-            // Advance the set order and flip the screen to the Rest Timer
             setCurrentSetOrder(prev => prev + 1);
             setIsResting(true);
             
@@ -77,7 +77,13 @@ const WorkoutLogger = () => {
         <div style={{ backgroundColor: '#181818', color: '#F4F4F4', padding: '20px', borderRadius: '12px' }}>
             <h2 style={{ color: '#E31B54', textAlign: 'center', marginBottom: '5px' }}>{exerciseName}</h2>
             <p style={{ textAlign: 'center', color: '#888', marginBottom: '25px', marginTop: 0 }}>Set {currentSetOrder}</p>
-            
+            <button 
+                onClick={() => navigate('/')} 
+                style={backBtnStyle}
+                aria-label="Go back"
+            >
+                <ArrowLeft size={24} />
+            </button>
             <div style={rowStyle}>
                 <Dumbbell size={24} color="#E31B54" />
                 <button onClick={() => adjustWeight(-2.5)} style={btnStyle}><Minus size={20} /></button>
@@ -104,5 +110,5 @@ const rowStyle = { display: 'flex', justifyContent: 'space-between', alignItems:
 const btnStyle = { backgroundColor: '#333', border: 'none', color: '#F4F4F4', padding: '15px', borderRadius: '8px', touchAction: 'manipulation' };
 const numberStyle = { fontSize: '28px', fontWeight: 'bold', minWidth: '80px', textAlign: 'center' };
 const submitBtnStyle = { width: '100%', backgroundColor: '#E31B54', color: '#F4F4F4', padding: '20px', border: 'none', borderRadius: '8px', fontSize: '18px', fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '20px' };
-
+const backBtnStyle = { position: 'absolute', top: '20px', left: '20px', background: 'transparent', border: 'none', color: '#F4F4F4', cursor: 'pointer', padding: '5px',display: 'flex',alignItems: 'center',justifyContent: 'center'};
 export default WorkoutLogger;
