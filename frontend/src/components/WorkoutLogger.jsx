@@ -2,8 +2,15 @@ import { useState, useEffect } from 'react';
 import { Plus, Minus, Dumbbell, Save } from 'lucide-react';
 import api from '../api';
 import RestTimer from './RestTimer'; // Import the new timer
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 
-const WorkoutLogger = ({ exerciseId, exerciseName }) => {
+const WorkoutLogger = () => {
+    const { exerciseId } = useParams(); // Grabs the ID from the URL (e.g., /workout/1)
+    const location = useLocation();
+    const navigate = useNavigate();
+    
+    // Grabs the name passed from the Dashboard, with a fallback
+    const exerciseName = location.state?.name || "Custom Exercise";
     const [weight, setWeight] = useState(0);
     const [reps, setReps] = useState(0);
     const [restTimer, setRestTimer] = useState(90);
