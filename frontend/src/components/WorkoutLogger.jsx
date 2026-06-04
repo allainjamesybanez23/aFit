@@ -1,22 +1,22 @@
 import { useState, useEffect } from 'react';
-import { Plus, Minus, Timer, Dumbbell, Save } from 'lucide-react';
+import { Plus, Minus, Dumbbell, Save } from 'lucide-react';
 import api from '../api';
+import RestTimer from './RestTimer'; // Import the new timer
 
 const WorkoutLogger = ({ exerciseId, exerciseName }) => {
-    // 1. Initialize State
     const [weight, setWeight] = useState(0);
     const [reps, setReps] = useState(0);
     const [restTimer, setRestTimer] = useState(90);
+    
+    // New State Variables for the Pacing Flow
     const [isLoading, setIsLoading] = useState(true);
+    const [isResting, setIsResting] = useState(false);
+    const [currentSetOrder, setCurrentSetOrder] = useState(1);
 
-    // 2. Automated Progression Tracking (Fetch Baseline)
     useEffect(() => {
         const fetchLastPerformance = async () => {
             try {
-                // Hitting the custom @action endpoint we built in Django
                 const response = await api.get(`/exercises/${exerciseId}/last_performance/`);
-                
-                // Pre-populate the UI so the user doesn't have to type anything
                 setWeight(parseFloat(response.data.weight));
                 setReps(parseInt(response.data.reps));
                 setRestTimer(parseInt(response.data.rest_timer_used));
@@ -30,37 +30,47 @@ const WorkoutLogger = ({ exerciseId, exerciseName }) => {
         fetchLastPerformance();
     }, [exerciseId]);
 
-    // 3. Zero-Typing Handlers
     const adjustWeight = (amount) => setWeight(prev => Math.max(0, prev + amount));
     const adjustReps = (amount) => setReps(prev => Math.max(0, prev + amount));
 
     const logSet = async () => {
-        // Send the completed set back to Django
         try {
             await api.post('/sets/', {
                 exercise: exerciseId,
                 weight: weight,
                 reps: reps,
                 rest_timer_used: restTimer,
-                // Hardcoding workout ID and set order for MVP testing
                 workout: 1, 
-                set_order: 1 
+                set_order: currentSetOrder 
             });
-            alert("Set Logged!");
-            // Here is where you would normally trigger the intelligent rest timer
+            
+            // Advance the set order and flip the screen to the Rest Timer
+            setCurrentSetOrder(prev => prev + 1);
+            setIsResting(true);
+            
         } catch (error) {
             console.error("Failed to log set", error);
         }
     };
 
-    if (isLoading) return <div className="text-white">Loading historical data...</div>;
+    if (isLoading) return <div style={{ color: '#F4F4F4' }}>Loading historical data...</div>;
 
-    // 4. The Aggressively Mobile-First UI
+    // View Routing: If resting, show the timer component
+    if (isResting) {
+        return (
+            <RestTimer 
+                initialSeconds={restTimer} 
+                onComplete={() => setIsResting(false)} 
+            />
+        );
+    }
+
+    // Default View: The Logger Component
     return (
         <div style={{ backgroundColor: '#181818', color: '#F4F4F4', padding: '20px', borderRadius: '12px' }}>
-            <h2 style={{ color: '#E31B54', textAlign: 'center', marginBottom: '20px' }}>{exerciseName}</h2>
+            <h2 style={{ color: '#E31B54', textAlign: 'center', marginBottom: '5px' }}>{exerciseName}</h2>
+            <p style={{ textAlign: 'center', color: '#888', marginBottom: '25px', marginTop: 0 }}>Set {currentSetOrder}</p>
             
-            {/* Weight Row */}
             <div style={rowStyle}>
                 <Dumbbell size={24} color="#E31B54" />
                 <button onClick={() => adjustWeight(-2.5)} style={btnStyle}><Minus size={20} /></button>
@@ -68,7 +78,6 @@ const WorkoutLogger = ({ exerciseId, exerciseName }) => {
                 <button onClick={() => adjustWeight(2.5)} style={btnStyle}><Plus size={20} /></button>
             </div>
 
-            {/* Reps Row */}
             <div style={rowStyle}>
                 <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#E31B54' }}>REPS</span>
                 <button onClick={() => adjustReps(-1)} style={btnStyle}><Minus size={20} /></button>
@@ -76,16 +85,14 @@ const WorkoutLogger = ({ exerciseId, exerciseName }) => {
                 <button onClick={() => adjustReps(1)} style={btnStyle}><Plus size={20} /></button>
             </div>
 
-            {/* Submit Button */}
             <button onClick={logSet} style={submitBtnStyle}>
                 <Save size={20} style={{ marginRight: '8px' }} />
-                LOG SET & START TIMER ({restTimer}s)
+                LOG SET & REST ({restTimer}s)
             </button>
         </div>
     );
 };
 
-// Quick inline styles for layout before you implement full CSS/Tailwind
 const rowStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', padding: '10px 0' };
 const btnStyle = { backgroundColor: '#333', border: 'none', color: '#F4F4F4', padding: '15px', borderRadius: '8px', touchAction: 'manipulation' };
 const numberStyle = { fontSize: '28px', fontWeight: 'bold', minWidth: '80px', textAlign: 'center' };
