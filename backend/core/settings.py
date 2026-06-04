@@ -44,7 +44,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'corsheaders',
     'rest_framework',
-    
+    'workouts',
+    'django.contrib.postgres',
 ]
 
 MIDDLEWARE = [
