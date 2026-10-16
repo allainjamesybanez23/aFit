@@ -1,32 +1,34 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
-import RestTimer from './RestTimer'; // Import the new timer
+import RestTimer from './RestTimer';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
-import { Plus, Minus, Dumbbell, Save, ArrowLeft } from 'lucide-react';
+import { Plus, Minus, ArrowLeft } from 'lucide-react';
 
 const WorkoutLogger = () => {
     const { exerciseId } = useParams(); // Grabs the ID from the URL (e.g., /workout/1)
     const location = useLocation();
     const navigate = useNavigate();
-    
+
     // Grabs the name passed from the Dashboard, with a fallback
     const exerciseName = location.state?.name || "Custom Exercise";
     const [weight, setWeight] = useState(0);
     const [reps, setReps] = useState(0);
     const [restTimer, setRestTimer] = useState(90);
-    
-    // New State Variables for the Pacing Flow
+
+    // Pacing flow state
     const [isLoading, setIsLoading] = useState(true);
     const [isResting, setIsResting] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveError, setSaveError] = useState(false);
     const [currentSetOrder, setCurrentSetOrder] = useState(1);
 
     useEffect(() => {
         const fetchLastPerformance = async () => {
             try {
                 const response = await api.get(`/exercises/${exerciseId}/last_performance/`);
-                setWeight(parseFloat(response.data.weight));
-                setReps(parseInt(response.data.reps));
-                setRestTimer(parseInt(response.data.rest_timer_used));
+                setWeight(parseFloat(response.data.weight) || 0);
+                setReps(parseInt(response.data.reps) || 0);
+                setRestTimer(parseInt(response.data.rest_timer_used) || 90);
             } catch (error) {
                 console.error("Error fetching performance data:", error);
             } finally {
@@ -41,6 +43,8 @@ const WorkoutLogger = () => {
     const adjustReps = (amount) => setReps(prev => Math.max(0, prev + amount));
 
     const logSet = async () => {
+        setIsSaving(true);
+        setSaveError(false);
         try {
             await api.post('/sets/', {
                 exercise: exerciseId,
@@ -48,67 +52,80 @@ const WorkoutLogger = () => {
                 reps: reps,
                 rest_timer_used: restTimer,
                 // Automatically pull the active session ID!
-                workout: localStorage.getItem('activeWorkoutId'), 
-                set_order: currentSetOrder 
+                workout: localStorage.getItem('activeWorkoutId'),
+                set_order: currentSetOrder
             });
-            
+
             setCurrentSetOrder(prev => prev + 1);
             setIsResting(true);
-            
         } catch (error) {
             console.error("Failed to log set", error);
+            setSaveError(true);
+        } finally {
+            setIsSaving(false);
         }
     };
-
-    if (isLoading) return <div style={{ color: '#F4F4F4' }}>Loading historical data...</div>;
 
     // View Routing: If resting, show the timer component
     if (isResting) {
         return (
-            <RestTimer 
-                initialSeconds={restTimer} 
-                onComplete={() => setIsResting(false)} 
+            <RestTimer
+                initialSeconds={restTimer}
+                nextSet={currentSetOrder}
+                onComplete={() => setIsResting(false)}
             />
         );
     }
 
-    // Default View: The Logger Component
     return (
-        <div style={{ backgroundColor: '#181818', color: '#F4F4F4', padding: '20px', borderRadius: '12px' }}>
-            <h2 style={{ color: '#E31B54', textAlign: 'center', marginBottom: '5px' }}>{exerciseName}</h2>
-            <p style={{ textAlign: 'center', color: '#888', marginBottom: '25px', marginTop: 0 }}>Set {currentSetOrder}</p>
-            <button 
-                onClick={() => navigate('/')} 
-                style={backBtnStyle}
-                aria-label="Go back"
-            >
-                <ArrowLeft size={24} />
-            </button>
-            <div style={rowStyle}>
-                <Dumbbell size={24} color="#E31B54" />
-                <button onClick={() => adjustWeight(-2.5)} style={btnStyle}><Minus size={20} /></button>
-                <span style={numberStyle}>{weight} lbs</span>
-                <button onClick={() => adjustWeight(2.5)} style={btnStyle}><Plus size={20} /></button>
-            </div>
+        <main className="screen">
+            <header className="topbar">
+                <button onClick={() => navigate('/')} className="btn btn-icon" aria-label="Back to exercises">
+                    <ArrowLeft size={24} />
+                </button>
+                <h1 className="topbar-title">{exerciseName}</h1>
+                <span className="chip">Set {currentSetOrder}</span>
+            </header>
 
-            <div style={rowStyle}>
-                <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#E31B54' }}>REPS</span>
-                <button onClick={() => adjustReps(-1)} style={btnStyle}><Minus size={20} /></button>
-                <span style={numberStyle}>{reps}</span>
-                <button onClick={() => adjustReps(1)} style={btnStyle}><Plus size={20} /></button>
-            </div>
+            <section className="body" style={{ gap: '12px' }}>
+                {isLoading ? (
+                    <>
+                        <div className="skeleton" style={{ height: '148px' }} aria-label="Loading last session" />
+                        <div className="skeleton" style={{ height: '148px' }} />
+                    </>
+                ) : (
+                    <>
+                        <Stepper label="Weight, lbs" value={weight} step={2.5} onAdjust={adjustWeight} i={0} />
+                        <Stepper label="Reps" value={reps} step={1} onAdjust={adjustReps} i={1} />
+                    </>
+                )}
+            </section>
 
-            <button onClick={logSet} style={submitBtnStyle}>
-                <Save size={20} style={{ marginRight: '8px' }} />
-                LOG SET & REST ({restTimer}s)
-            </button>
-        </div>
+            <div className="dock">
+                {saveError && <p className="error" role="alert">Couldn't save that set. Check your connection and try again.</p>}
+                <button onClick={logSet} className="btn btn-primary" disabled={isLoading || isSaving}>
+                    {isSaving ? 'Saving…' : 'Log set'}
+                    <span className="meta">Rest {restTimer}s</span>
+                </button>
+            </div>
+        </main>
     );
 };
 
-const rowStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', padding: '10px 0' };
-const btnStyle = { backgroundColor: '#333', border: 'none', color: '#F4F4F4', padding: '15px', borderRadius: '8px', touchAction: 'manipulation' };
-const numberStyle = { fontSize: '28px', fontWeight: 'bold', minWidth: '80px', textAlign: 'center' };
-const submitBtnStyle = { width: '100%', backgroundColor: '#E31B54', color: '#F4F4F4', padding: '20px', border: 'none', borderRadius: '8px', fontSize: '18px', fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '20px' };
-const backBtnStyle = { position: 'absolute', top: '20px', left: '20px', background: 'transparent', border: 'none', color: '#F4F4F4', cursor: 'pointer', padding: '5px',display: 'flex',alignItems: 'center',justifyContent: 'center'};
+const Stepper = ({ label, value, step, onAdjust, i }) => (
+    <div className="stepper rise" style={{ '--i': i }}>
+        <div className="stepper-label">{label}</div>
+        <div className="stepper-row">
+            <button onClick={() => onAdjust(-step)} className="btn btn-step" aria-label={`Decrease ${label}`}>
+                <Minus size={24} />
+            </button>
+            {/* key remounts the number so it pops on every change */}
+            <span key={value} className="stepper-value pop" aria-live="polite">{value}</span>
+            <button onClick={() => onAdjust(step)} className="btn btn-step" aria-label={`Increase ${label}`}>
+                <Plus size={24} />
+            </button>
+        </div>
+    </div>
+);
+
 export default WorkoutLogger;

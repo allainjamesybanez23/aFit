@@ -1,61 +1,81 @@
 import { useState, useEffect } from 'react';
-import { Play, Minus, Plus, Timer } from 'lucide-react';
+import { SkipForward } from 'lucide-react';
 
-const RestTimer = ({ initialSeconds, onComplete }) => {
+const RING = 2 * Math.PI * 46; // circumference for r=46 in a 100x100 viewBox
+
+const RestTimer = ({ initialSeconds, nextSet, onComplete }) => {
     const [timeLeft, setTimeLeft] = useState(initialSeconds);
+    // Grows when +15s pushes past it, so the ring stays honest
+    const [total, setTotal] = useState(initialSeconds);
 
     // The Countdown Engine
     useEffect(() => {
         if (timeLeft <= 0) {
-            onComplete(); 
+            onComplete();
             return;
         }
-        
+
         const interval = setInterval(() => {
             setTimeLeft((prev) => prev - 1);
         }, 1000);
-        
+
         // Cleanup interval on unmount
         return () => clearInterval(interval);
     }, [timeLeft, onComplete]);
 
     // Zero-Typing Time Adjustments
     const adjustTime = (amount) => {
-        setTimeLeft((prev) => Math.max(0, prev + amount));
+        const next = Math.max(0, timeLeft + amount);
+        setTimeLeft(next);
+        setTotal(t => Math.max(t, next));
     };
 
-    // Format seconds into MM:SS for the UI
+    // Format seconds into M:SS for the UI
     const formatTime = (totalSeconds) => {
         const minutes = Math.floor(totalSeconds / 60);
         const seconds = totalSeconds % 60;
         return `${minutes}:${seconds.toString().padStart(2, '0')}`;
     };
 
+    const progress = total > 0 ? timeLeft / total : 0;
+
     return (
-        <div style={{ backgroundColor: '#181818', color: '#F4F4F4', padding: '20px', borderRadius: '12px', textAlign: 'center' }}>
-            <Timer size={32} color="#E31B54" style={{ marginBottom: '10px' }} />
-            <h2 style={{ color: '#E31B54', margin: '0 0 20px 0' }}>RECOVER</h2>
-            
-            <div style={{ fontSize: '72px', fontWeight: 'bold', letterSpacing: '2px', marginBottom: '30px' }}>
-                {formatTime(timeLeft)}
-            </div>
+        <main className="screen">
+            <header className="topbar">
+                <h1 className="topbar-title">Rest</h1>
+                <span className="chip">Set {nextSet} next</span>
+            </header>
 
-            <div style={rowStyle}>
-                <button onClick={() => adjustTime(-15)} style={adjustBtnStyle}>-15s</button>
-                <button onClick={() => adjustTime(15)} style={adjustBtnStyle}>+15s</button>
-            </div>
+            <section className="body" style={{ justifyContent: 'center' }}>
+                <div className="ring rise" role="timer" aria-label={`${formatTime(timeLeft)} rest remaining`}>
+                    <svg viewBox="0 0 100 100" aria-hidden="true">
+                        <circle className="ring-track" cx="50" cy="50" r="46" fill="none" strokeWidth="5" />
+                        <circle
+                            className="ring-fill"
+                            cx="50" cy="50" r="46" fill="none" strokeWidth="5" strokeLinecap="round"
+                            strokeDasharray={RING}
+                            strokeDashoffset={RING * (1 - progress)}
+                        />
+                    </svg>
+                    <div className="ring-time">
+                        {formatTime(timeLeft)}
+                        <small>of {formatTime(total)}</small>
+                    </div>
+                </div>
+            </section>
 
-            <button onClick={() => onComplete()} style={skipBtnStyle}>
-                <Play size={20} style={{ marginRight: '8px' }} />
-                SKIP & START NEXT SET
-            </button>
-        </div>
+            <div className="dock">
+                <div className="split">
+                    <button onClick={() => adjustTime(-15)} className="btn btn-ghost">-15s</button>
+                    <button onClick={() => adjustTime(15)} className="btn btn-ghost">+15s</button>
+                </div>
+                <button onClick={() => onComplete()} className="btn btn-primary">
+                    <SkipForward size={20} strokeWidth={2.25} />
+                    Skip rest
+                </button>
+            </div>
+        </main>
     );
 };
-
-// Inline styles
-const rowStyle = { display: 'flex', justifyContent: 'space-between', marginBottom: '30px', gap: '10px' };
-const adjustBtnStyle = { flex: 1, backgroundColor: '#333', border: 'none', color: '#F4F4F4', padding: '20px', borderRadius: '8px', fontSize: '18px', fontWeight: 'bold', touchAction: 'manipulation' };
-const skipBtnStyle = { width: '100%', backgroundColor: '#E31B54', color: '#F4F4F4', padding: '20px', border: 'none', borderRadius: '8px', fontSize: '18px', fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center' };
 
 export default RestTimer;
